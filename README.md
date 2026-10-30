@@ -79,7 +79,10 @@ signguard-ai/
 ├── notebooks/
 │   ├── signguard_model.ipynb          Colab version   (Drive + unzip)
 │   └── signguard_model_kaggle.ipynb   Kaggle version  (dataset mounted read-only)
+├── api/main.py                        FastAPI: /predict, /meta, /reload
+├── web/                               Next.js app (App Router, TypeScript, SCSS)
 ├── predict.py                         single-image CLI with the UNKNOWN path
+├── run.sh                             starts the API and the web app together
 ├── models/                            signguard_calibrated.pth  (not in git)
 ├── docs/                              audit figures
 └── requirements.txt
@@ -102,7 +105,7 @@ Either way the run takes roughly 25 minutes and produces `signguard_calibrated.p
 the fitted temperature and the audited threshold — and an `outputs/` folder with `audit.json` and
 every figure.
 
-**Inference** runs locally on CPU:
+**Inference** runs locally on CPU, either from the command line:
 
 ```bash
 pip install -r requirements.txt
@@ -110,6 +113,22 @@ pip install -r requirements.txt
 python predict.py path/to/sign.jpg
 python predict.py photos/*.jpg --json
 ```
+
+or through the app:
+
+```bash
+./run.sh          # FastAPI on :8000, Next.js on :3000
+```
+
+The app is where the gate becomes visible. Drop in a sign and the verdict is
+either a label or **UNKNOWN**; the confidence slider moves the gate and the
+verdict flips live; the sticker slider covers the sign the way tape would and
+the prediction collapses while the confidence stays high — which is the whole
+argument for having a gate. The threshold is applied in the browser, so it
+responds instantly; occlusion changes the image, so it re-runs the model.
+
+The sticker code in `api/main.py` is the same routine the audit notebook uses,
+so the demo and the reported numbers cannot drift apart.
 
 ## Method notes
 
@@ -141,6 +160,7 @@ python predict.py photos/*.jpg --json
 ## Stack
 
 PyTorch · torchvision · MobileNetV2 (ImageNet transfer learning) · scikit-learn · matplotlib
+FastAPI · Next.js 14 · TypeScript · SCSS
 
 ---
 

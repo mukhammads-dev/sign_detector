@@ -17,3 +17,9 @@ venv/
 
 # os
 .DS_Store
+
+# web app
+node_modules/
+.next/
+out/
+.env.local

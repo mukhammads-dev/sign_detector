@@ -1,0 +1,342 @@
+// SignGuard — one palette, three state colours, nothing decorative.
+// The interface has exactly one job: make "answered" and "refused" impossible
+// to confuse at a glance.
+
+$bg: #0e1116;
+$panel: #161b22;
+$border: #222935;
+$track: #232a35;
+$text: #e6edf3;
+$muted: #8b949e;
+$dim: #6e7681;
+
+$accept: #3fb950;
+$reject: #d29922;
+$danger: #f85149;
+$accent: #58a6ff;
+
+$radius: 14px;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: $bg;
+  color: $text;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+}
+
+.header {
+  margin-bottom: 28px;
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: 26px;
+    letter-spacing: -0.3px;
+  }
+
+  p {
+    margin: 0;
+    color: $muted;
+    font-size: 14px;
+    max-width: 640px;
+    line-height: 1.6;
+  }
+}
+
+.banner {
+  margin-bottom: 24px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba($danger, 0.35);
+  background: rgba($danger, 0.08);
+  color: #ffb4ae;
+  font-size: 13px;
+  line-height: 1.6;
+
+  code {
+    background: rgba(0, 0, 0, 0.35);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+
+  @media (max-width: 920px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: $panel;
+  border: 1px solid $border;
+  border-radius: $radius;
+  padding: 18px;
+
+  h2 {
+    margin: 0 0 14px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: $muted;
+  }
+
+  & + .card {
+    margin-top: 20px;
+  }
+}
+
+// ---------------------------------------------------------------- dropzone
+.dropzone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  border: 1.5px dashed #2d3542;
+  border-radius: 12px;
+  background: #0d1117;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  overflow: hidden;
+
+  &:hover,
+  &.over {
+    border-color: $accent;
+    background: rgba($accent, 0.05);
+  }
+
+  input {
+    display: none;
+  }
+
+  img {
+    max-width: 100%;
+    max-height: 420px;
+    display: block;
+  }
+
+  .hint {
+    text-align: center;
+    color: $dim;
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 24px;
+
+    strong {
+      color: $text;
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+  }
+}
+
+// ---------------------------------------------------------------- verdict
+.verdict {
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid;
+
+  &.accepted {
+    border-color: rgba($accept, 0.4);
+    background: rgba($accept, 0.08);
+  }
+
+  &.rejected {
+    border-color: rgba($reject, 0.4);
+    background: rgba($reject, 0.08);
+  }
+
+  .state {
+    font-size: 11px;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  &.accepted .state {
+    color: $accept;
+  }
+
+  &.rejected .state {
+    color: $reject;
+  }
+
+  .label {
+    font-size: 24px;
+    font-weight: 650;
+    letter-spacing: -0.2px;
+    line-height: 1.25;
+  }
+
+  .sub {
+    margin-top: 8px;
+    font-size: 13px;
+    color: $muted;
+    line-height: 1.6;
+  }
+}
+
+// ---------------------------------------------------------------- bars
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.bar {
+  display: grid;
+  grid-template-columns: 1fr 48px;
+  align-items: center;
+  gap: 10px;
+
+  .name {
+    font-size: 12.5px;
+    color: $muted;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .value {
+    font-size: 12px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: $text;
+  }
+
+  .track {
+    grid-column: 1 / -1;
+    height: 6px;
+    background: $track;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .fill {
+    height: 100%;
+    border-radius: 3px;
+    background: $accent;
+    transition: width 0.18s ease;
+  }
+
+  &:first-child .fill {
+    background: $accept;
+  }
+}
+
+// ---------------------------------------------------------------- sliders
+.control {
+  & + .control {
+    margin-top: 18px;
+  }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 7px;
+  }
+
+  .name {
+    font-size: 13px;
+    color: $text;
+  }
+
+  .value {
+    font-size: 12px;
+    color: $accent;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .note {
+    margin-top: 7px;
+    font-size: 11.5px;
+    color: $dim;
+    line-height: 1.55;
+  }
+}
+
+input[type="range"] {
+  width: 100%;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: $track;
+  outline: none;
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: $accent;
+    cursor: pointer;
+    border: 2px solid $bg;
+  }
+
+  &::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: $accent;
+    cursor: pointer;
+    border: 2px solid $bg;
+  }
+}
+
+// ---------------------------------------------------------------- misc
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .fact {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12.5px;
+
+    dt {
+      color: $muted;
+      margin: 0;
+    }
+
+    dd {
+      margin: 0;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+
+.spinner {
+  text-align: center;
+  padding: 18px;
+  color: $muted;
+  font-size: 13px;
+}
+
+.footnote {
+  margin-top: 26px;
+  color: $dim;
+  font-size: 12px;
+  line-height: 1.7;
+}
