@@ -1,0 +1,19 @@
+# model weights - too large for git, download from Colab
+*.pth
+*.pt
+models/*
+!models/.gitkeep
+
+# datasets
+data/
+outputs/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# os
+.DS_Store
