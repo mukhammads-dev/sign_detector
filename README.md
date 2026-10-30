@@ -3,7 +3,7 @@
 Traffic sign recognition that knows when **not** to answer.
 
 A MobileNetV2 classifier on GTSRB (43 German traffic sign classes), plus a safety audit that
-measures whether its confidence can be trusted and turns the answer into a gated decision:
+measures whether its confidence can be trusted and turns the output into a gated decision:
 predict, or return `UNKNOWN`.
 
 ```
@@ -17,6 +17,9 @@ billboard.jpg
      18.7%  Priority road
       7.1%  No vehicles
 ```
+
+> **Status:** the model and the full audit pipeline are implemented and reproducible end to end.
+> The results table below is filled from `outputs/audit.json` once the training run completes.
 
 ---
 
@@ -35,32 +38,37 @@ single scalar fitted on validation data that changes no prediction, only how con
 sounds.
 
 **2. Out-of-distribution rejection.** Two scores (maximum softmax probability and free energy) are
-compared on far-OOD inputs (CIFAR-10 photos) and near-OOD inputs (real signs with a quarter of
-their surface covered), scored by AUROC.
+compared on far-OOD inputs and near-OOD inputs (real signs with a quarter of their surface
+covered), scored by AUROC.
 
 **3. Occlusion robustness.** The physical sticker attack, simulated: opaque patches covering 5% to
 40% of the sign face. Accuracy is plotted against the model's confidence *on the answers it gets
 wrong*. The gap between those two curves is the silent-failure zone.
 
+The output of the audit is one line of production logic:
+
+```python
+accept the prediction only if calibrated confidence >= THRESHOLD, else return UNKNOWN
+```
+
+with the threshold chosen on validation data to hit a target selective accuracy, and its real cost
+and benefit reported on the held-out test set.
+
 ---
 
 ## Results
 
-<!-- paste outputs/results_table.md from the notebook here after running it -->
-
 | Metric | No gate | Confidence gate |
 |---|---|---|
-| Inputs answered | 100% | _tbd_ |
-| Accuracy on answers | _tbd_ | _tbd_ |
-| Calibration error (ECE) | _tbd_ | _tbd_ |
-| Silent failure, clean signs | _tbd_ | _tbd_ |
-| Silent failure, 20% covered | _tbd_ | _tbd_ |
-| Non-signs wrongly classified | 100% | _tbd_ |
+| Inputs answered | 100% | _pending_ |
+| Accuracy on answers | _pending_ | _pending_ |
+| Calibration error (ECE) | _pending_ | _pending_ |
+| Silent failure, clean signs | _pending_ | _pending_ |
+| Silent failure, 20% covered | _pending_ | _pending_ |
+| Non-signs wrongly classified | 100% | _pending_ |
 
-OOD detection AUROC — far (CIFAR-10) / near (25% covered signs): _tbd_
-
-![calibration](docs/calibration.png)
-![occlusion](docs/occlusion_curve.png)
+The notebook writes `outputs/results_table.md` in exactly this format — it is pasted in verbatim,
+and `outputs/audit.json` carries the same numbers machine-readably.
 
 ---
 
@@ -68,28 +76,37 @@ OOD detection AUROC — far (CIFAR-10) / near (25% covered signs): _tbd_
 
 ```
 signguard-ai/
-├── notebooks/signguard_model.ipynb   training (Part A) + safety audit (Part B)
-├── predict.py                        single-image CLI with the UNKNOWN path
-├── models/                           signguard_calibrated.pth  (not in git)
-├── docs/                             audit figures
+├── notebooks/
+│   ├── signguard_model.ipynb          Colab version   (Drive + unzip)
+│   └── signguard_model_kaggle.ipynb   Kaggle version  (dataset mounted read-only)
+├── predict.py                         single-image CLI with the UNKNOWN path
+├── models/                            signguard_calibrated.pth  (not in git)
+├── docs/                              audit figures
 └── requirements.txt
 ```
 
 ## Running it
 
-**Training and the audit** run in Google Colab on a free T4 GPU. Open
-`notebooks/signguard_model.ipynb`, set `Runtime -> Change runtime type -> T4 GPU`, and run every
-cell. The dataset downloads itself through `torchvision`; no Kaggle token is needed. Roughly 25
-minutes end to end.
+Training and the audit need a GPU. Either notebook runs the identical pipeline; they differ only
+in how the dataset is reached.
 
-The notebook writes `signguard_calibrated.pth` — weights plus the fitted temperature and the
-audited threshold — and an `outputs/` folder with `audit.json` and every figure.
+**Kaggle** (recommended — the dataset lives there, so nothing is uploaded):
+open `notebooks/signguard_model_kaggle.ipynb`, add
+[GTSRB](https://www.kaggle.com/datasets/meowmeowmeowmeowmeow/gtsrb-german-traffic-sign) as an
+input, set the accelerator to GPU, run all.
+
+**Colab:** download the same dataset, put the zip in Drive as `gtsrb_dataset.zip`, open
+`notebooks/signguard_model.ipynb`, set the runtime to T4 GPU, run all.
+
+Either way the run takes roughly 25 minutes and produces `signguard_calibrated.pth` — weights plus
+the fitted temperature and the audited threshold — and an `outputs/` folder with `audit.json` and
+every figure.
 
 **Inference** runs locally on CPU:
 
 ```bash
 pip install -r requirements.txt
-# download signguard_calibrated.pth from Colab into models/
+# put signguard_calibrated.pth in models/
 python predict.py path/to/sign.jpg
 python predict.py photos/*.jpg --json
 ```
@@ -102,10 +119,15 @@ python predict.py photos/*.jpg --json
 - **Two-phase training.** The ImageNet backbone is frozen while the new 43-way head settles, then
   the last four blocks are unfrozen at a 10× smaller learning rate. Traffic signs are far from the
   ImageNet distribution, so frozen features alone leave accuracy on the table.
+- **Labels come from the CSVs, not from folder names.** The class directories are named `0`, `1`,
+  … `42`, which `ImageFolder` would sort lexicographically into `0, 1, 10, 11, …` — silently
+  scrambling every label. `Train.csv` / `Test.csv` carry the correct `ClassId`.
 - **The GTSRB test split is a genuine holdout** — photographed on different roads on different
   days than the training split, not a reshuffle of the same images.
 - **The threshold is chosen on validation, never on test.** Fitting the operating point on the
-  test set would make every number below meaningless.
+  test set would make every number above meaningless.
+- **Occlusion coverage is measured, not assumed.** Patches overlap and clip at the border, so the
+  area actually covered is below the nominal value; the real fraction is what gets reported.
 
 ## Limitations
 
@@ -122,6 +144,6 @@ PyTorch · torchvision · MobileNetV2 (ImageNet transfer learning) · scikit-lea
 
 ---
 
-Built as a portfolio project. Companion to
+Portfolio project. Companion to
 [DriveSafe AI](https://github.com/mukhammads-dev/drivesafe-ai) — webcam driver-fatigue detection
 with OpenCV.

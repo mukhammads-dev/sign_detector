@@ -29,10 +29,12 @@ def load_model(ckpt_path, device):
     if not os.path.exists(ckpt_path):
         sys.exit(
             f"checkpoint not found: {ckpt_path}\n"
-            "Run notebooks/signguard_model.ipynb in Colab and download "
-            "signguard_calibrated.pth into models/."
+            "Run a notebook from notebooks/ on Kaggle or Colab, then put the "
+            "resulting signguard_calibrated.pth in models/."
         )
-    ckpt = torch.load(ckpt_path, map_location=device)
+    # weights_only=True: the checkpoint holds tensors, strings and floats only,
+    # so it loads without unpickling arbitrary objects.
+    ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
 
     classes = ckpt["classes"]
     model = models.mobilenet_v2(weights=None)
@@ -103,12 +105,16 @@ def main():
         print(json.dumps(results, indent=2))
         return
 
+    # colour only when writing to a real terminal, so piped output stays clean
+    color = sys.stdout.isatty()
+    GREEN, YELLOW, OFF = ("\033[92m", "\033[93m", "\033[0m") if color else ("", "", "")
+
     print(f"\nthreshold {meta['threshold']:.2f}   temperature {meta['temperature']:.2f}\n")
     for r in results:
         if r["accepted"]:
-            head = f"\033[92m{r['label']}\033[0m   {r['confidence']*100:.1f}%"
+            head = f"{GREEN}{r['label']}{OFF}   {r['confidence']*100:.1f}%"
         else:
-            head = (f"\033[93mUNKNOWN\033[0m   best guess '{r['label']}' at "
+            head = (f"{YELLOW}UNKNOWN{OFF}   best guess '{r['label']}' at "
                     f"{r['confidence']*100:.1f}%, below threshold")
         print(f"{r['file']}\n  {head}")
         for name, p in r["topk"][1:]:
