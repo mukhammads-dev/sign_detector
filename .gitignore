@@ -23,3 +23,6 @@ node_modules/
 .next/
 out/
 .env.local
+
+# next generates this
+web/next-env.d.ts
