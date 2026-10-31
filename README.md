@@ -58,17 +58,67 @@ and benefit reported on the held-out test set.
 
 ## Results
 
-| Metric | No gate | Confidence gate |
-|---|---|---|
-| Inputs answered | 100% | _pending_ |
-| Accuracy on answers | _pending_ | _pending_ |
-| Calibration error (ECE) | _pending_ | _pending_ |
-| Silent failure, clean signs | _pending_ | _pending_ |
-| Silent failure, 20% covered | _pending_ | _pending_ |
-| Non-signs wrongly classified | 100% | _pending_ |
+MobileNetV2, 8 epochs (4 frozen + 4 fine-tuned), 12,630 held-out test images.
 
-The notebook writes `outputs/results_table.md` in exactly this format — it is pasted in verbatim,
-and `outputs/audit.json` carries the same numbers machine-readably.
+| Metric | No gate | Confidence gate (T=0.86, thr=0.73) |
+|---|---|---|
+| Inputs answered | 100% | 91.7% |
+| Accuracy on answers | 91.62% | **95.62%** |
+| Calibration error (ECE) | 2.06% | 3.08% |
+| Silent failure, clean signs | 8.38% | **4.02%** |
+| Silent failure, 20% covered | 61.4% | **23.7%** |
+| Non-signs wrongly classified | 100% | **35.7%** |
+
+OOD detection, AUROC — far (Food101 photos) / near (signs 25% covered):
+
+| Score | far-OOD | near-OOD |
+|---|---|---|
+| Max softmax probability | 0.923 | 0.869 |
+| **Energy** | **0.994** | **0.936** |
+
+Refusing 8.3% of inputs cuts the silent-failure rate in half on clean signs and by a factor of
+2.6 under the sticker attack. That is the trade the gate makes, measured rather than asserted.
+
+### Three things the audit found that the accuracy number hides
+
+**Validation accuracy overstated the model by six points.** 97.74% on the validation split,
+91.62% on the official test split. The validation images come from the same recording sessions as
+the training images; the test set was shot on different roads on different days. The second
+number is the honest one.
+
+**Temperature scaling made calibration worse, and that is a finding, not a bug.** The fitted
+temperature was 0.86 — below 1, meaning the model looked *under*-confident on validation, where it
+is 97.7% accurate. Sharpening it there makes it overconfident on test, where it is 91.6% accurate:
+ECE moved from 2.06% to 3.08%. Temperature scaling assumes the calibration set and the deployment
+set are drawn from the same distribution. Here they are not, and the method inherits the gap.
+The same mechanism explains the threshold: 0.73 was chosen on validation to reach 99% selective
+accuracy, and delivered 95.62% on test.
+
+**Energy beats max-softmax by a wide margin on out-of-distribution input** — 0.994 against 0.923
+on far-OOD, 0.936 against 0.869 on near-OOD. The gate currently thresholds softmax confidence, so
+35.7% of non-sign images still get an answer. Gating on energy instead is the single clearest
+improvement available, and the audit is what makes that visible.
+
+Raw numbers: `outputs/audit.json`. Figures: `docs/`.
+
+### Fine-tuning was necessary, and the log proves it
+
+```
+            val accuracy
+[1/8]  0.6387   backbone frozen
+[2/8]  0.6965
+[3/8]  0.7216
+[4/8]  0.7114   ← plateau, and a step backwards
+>>> fine-tuning starts
+[5/8]  0.9305   ← +22 points in one epoch
+[6/8]  0.9488
+[7/8]  0.9774
+[8/8]  0.9770
+```
+
+Frozen ImageNet features stall at 72% on traffic signs. Unfreezing the last four blocks at a 10×
+smaller learning rate recovers 22 points in a single epoch — a measurement of how far this domain
+sits from ImageNet, not a guess.
 
 ---
 
@@ -79,10 +129,7 @@ signguard-ai/
 ├── notebooks/
 │   ├── signguard_model.ipynb          Colab version   (Drive + unzip)
 │   └── signguard_model_kaggle.ipynb   Kaggle version  (dataset mounted read-only)
-├── api/main.py                        FastAPI: /predict, /meta, /reload
-├── web/                               Next.js app (App Router, TypeScript, SCSS)
 ├── predict.py                         single-image CLI with the UNKNOWN path
-├── run.sh                             starts the API and the web app together
 ├── models/                            signguard_calibrated.pth  (not in git)
 ├── docs/                              audit figures
 └── requirements.txt
@@ -105,7 +152,7 @@ Either way the run takes roughly 25 minutes and produces `signguard_calibrated.p
 the fitted temperature and the audited threshold — and an `outputs/` folder with `audit.json` and
 every figure.
 
-**Inference** runs locally on CPU, either from the command line:
+**Inference** runs locally on CPU:
 
 ```bash
 pip install -r requirements.txt
@@ -113,22 +160,6 @@ pip install -r requirements.txt
 python predict.py path/to/sign.jpg
 python predict.py photos/*.jpg --json
 ```
-
-or through the app:
-
-```bash
-./run.sh          # FastAPI on :8000, Next.js on :3000
-```
-
-The app is where the gate becomes visible. Drop in a sign and the verdict is
-either a label or **UNKNOWN**; the confidence slider moves the gate and the
-verdict flips live; the sticker slider covers the sign the way tape would and
-the prediction collapses while the confidence stays high — which is the whole
-argument for having a gate. The threshold is applied in the browser, so it
-responds instantly; occlusion changes the image, so it re-runs the model.
-
-The sticker code in `api/main.py` is the same routine the audit notebook uses,
-so the demo and the reported numbers cannot drift apart.
 
 ## Method notes
 
@@ -154,13 +185,17 @@ so the demo and the reported numbers cannot drift apart.
   model and are substantially stronger.
 - GTSRB is German signage in daylight. Night, rain and other countries' signage are untested — and
   are precisely the near-OOD cases the gate exists to catch.
-- The gate reduces silent failures; it does not eliminate them. Anything built on this needs a
-  second sensor.
+- The gate reduces silent failures; it does not eliminate them. More than a third of non-sign
+  images still get an answer. Anything built on this needs a second sensor.
+- Calibration is fitted on a validation split that is easier than the test set, so both the
+  temperature and the threshold under-deliver on deployment data. The honest fix is a calibration
+  set drawn from the deployment distribution, not from the training recordings.
+- 91.6% is well short of the 99%+ published on GTSRB. Eight epochs at 224×224 with a partly frozen
+  backbone is a modest recipe; the project spends its effort on the audit, not on the leaderboard.
 
 ## Stack
 
 PyTorch · torchvision · MobileNetV2 (ImageNet transfer learning) · scikit-learn · matplotlib
-FastAPI · Next.js 14 · TypeScript · SCSS
 
 ---
 
